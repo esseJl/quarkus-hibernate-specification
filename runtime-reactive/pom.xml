@@ -9,8 +9,8 @@
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    <artifactId>quarkus-hibernate-specification</artifactId>
-    <name>Quarkus Hibernate Specification - Blocking</name>
+    <artifactId>quarkus-hibernate-specification-reactive</artifactId>
+    <name>Quarkus Hibernate Specification - Reactive</name>
     <dependencies>
         <dependency>
             <groupId>io.quarkiverse.hibernatespecification</groupId>
@@ -19,7 +19,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-orm-panache</artifactId>
+            <artifactId>quarkus-hibernate-reactive-panache</artifactId>
         </dependency>
     </dependencies>
 
