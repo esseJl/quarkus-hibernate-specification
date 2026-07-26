@@ -3,7 +3,6 @@ package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.re
 import java.util.List;
 import java.util.concurrent.Executor;
 
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.inject.Inject;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -16,6 +15,7 @@ import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.cri
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.PageResponse;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.QueryRequest;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 public class ReactiveSpecificationExecutor {
 
@@ -26,12 +26,11 @@ public class ReactiveSpecificationExecutor {
 
     @Inject
     public ReactiveSpecificationExecutor(Mutiny.SessionFactory sessionFactory,
-                                         CriteriaPredicateFactory predicateFactory) {
+            CriteriaPredicateFactory predicateFactory) {
         this.sessionFactory = sessionFactory;
         this.predicateFactory = predicateFactory;
         this.blockingExecutor = Infrastructure.getDefaultWorkerPool();
     }
-
 
     public <T> Uni<PageResponse<T>> findPage(Class<T> entityClass, QueryRequest request) {
         return Uni.combine().all()
@@ -41,15 +40,13 @@ public class ReactiveSpecificationExecutor {
     }
 
     public <T> Uni<PageResponse<T>> findPageInSingleSession(Class<T> entityClass, QueryRequest request) {
-        return sessionFactory.withSession(session ->
-                buildFindQuery(session, entityClass, request)
-                        .map(q -> applyPagination(q, request))
-                        .flatMap(Mutiny.SelectionQuery::getResultList)
-                        .flatMap(list -> buildCountQuery(session, entityClass, request)
-                                .flatMap(Mutiny.SelectionQuery::getSingleResult)
-                                .map(total -> PageResponse.of(list, total, request.page()))));
+        return sessionFactory.withSession(session -> buildFindQuery(session, entityClass, request)
+                .map(q -> applyPagination(q, request))
+                .flatMap(Mutiny.SelectionQuery::getResultList)
+                .flatMap(list -> buildCountQuery(session, entityClass, request)
+                        .flatMap(Mutiny.SelectionQuery::getSingleResult)
+                        .map(total -> PageResponse.of(list, total, request.page()))));
     }
-
 
     public <T> Uni<List<T>> find(Class<T> entityClass, QueryRequest request) {
         return sessionFactory.withSession(session -> buildFindQuery(session, entityClass, request)
@@ -65,32 +62,32 @@ public class ReactiveSpecificationExecutor {
     private <T> Uni<Mutiny.SelectionQuery<T>> buildFindQuery(
             Mutiny.Session session, Class<T> entityClass, QueryRequest request) {
         return Uni.createFrom().item(() -> {
-                    CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
-                    CriteriaQuery<T> cq = cb.createQuery(entityClass);
-                    Root<T> root = cq.from(entityClass);
-                    SpecificationQuerySupport.applySortAndWhere(cb, cq, root, request, predicateFactory);
-                    return session.createQuery(cq);
-                })
+            CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+            CriteriaQuery<T> cq = cb.createQuery(entityClass);
+            Root<T> root = cq.from(entityClass);
+            SpecificationQuerySupport.applySortAndWhere(cb, cq, root, request, predicateFactory);
+            return session.createQuery(cq);
+        })
                 .runSubscriptionOn(blockingExecutor);
     }
 
     private <T> Uni<Mutiny.SelectionQuery<Long>> buildCountQuery(
             Mutiny.Session session, Class<T> entityClass, QueryRequest request) {
         return Uni.createFrom().item(() -> {
-                    CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
-                    CriteriaQuery<Long> cq = cb.createQuery(Long.class);
-                    Root<T> root = cq.from(entityClass);
-                    cq.select(cb.count(root));
-                    if (request.filter() != null) {
-                        cq.where(predicateFactory.build(cb, root, request.filter()));
-                    }
-                    return session.createQuery(cq);
-                })
+            CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+            CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+            Root<T> root = cq.from(entityClass);
+            cq.select(cb.count(root));
+            if (request.filter() != null) {
+                cq.where(predicateFactory.build(cb, root, request.filter()));
+            }
+            return session.createQuery(cq);
+        })
                 .runSubscriptionOn(blockingExecutor);
     }
 
     private static <T> Mutiny.SelectionQuery<T> applyPagination(Mutiny.SelectionQuery<T> query,
-                                                                QueryRequest request) {
+            QueryRequest request) {
         if (request.page() != null) {
             query.setFirstResult(request.page().offset());
             query.setMaxResults(request.page().size());

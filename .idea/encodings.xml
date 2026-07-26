@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/deployment-reactive/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/deployment-reactive/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/deployment/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/deployment/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/docs/modules/ROOT/examples" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/docs/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/integration-tests/blocking/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/integration-tests/blocking/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/integration-tests/reactive/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/integration-tests/reactive/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/integration-tests/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/integration-tests/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/runtime-common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/runtime-common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/runtime-reactive/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/runtime-reactive/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/runtime/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/runtime/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
+    <file url="file://$USER_HOME$/modules/ROOT/examples" charset="UTF-8" />
+    <file url="file://$USER_HOME$/src/main/java" charset="UTF-8" />
+    <file url="file://$USER_HOME$/src/main/resources" charset="UTF-8" />
+    <file url="file:///src/main/java" charset="UTF-8" />
+    <file url="file:///src/main/resources" charset="UTF-8" />
+  </component>
+</project>

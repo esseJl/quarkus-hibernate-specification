@@ -1,27 +1,27 @@
 = Quarkus Hibernate Specification
 
-include::./includes/attributes.adoc[]
-
-TIP: Describe what the extension does here.
+This extension provides a Spring-Data-JPA-Specification style dynamic query builder
+for both Hibernate ORM and Hibernate Reactive.
 
 == Installation
 
-If you want to use this extension, you need to add the `io.quarkiverse.hibernatespecification:quarkus-hibernate-specification` extension first to your build file.
-
-For instance, with Maven, add the following dependency to your POM file:
-
-[source,xml,subs=attributes+]
+[source,xml]
 ----
 <dependency>
-    <groupId>io.quarkiverse.hibernatespecification</groupId>
-    <artifactId>quarkus-hibernate-specification</artifactId>
-    <version>{project-version}</version>
+  <groupId>io.quarkiverse.hibernatespecification</groupId>
+  <artifactId>quarkus-hibernate-specification</artifactId>
+  <version>${quarkus-hibernate-specification.version}</version>
 </dependency>
 ----
 
-[[extension-configuration-reference]]
-== Extension Configuration Reference
+== Usage
 
-TIP: Remove this section if you don't have Quarkus configuration properties in your extension.
+[source,java]
+----
+@Inject
+SpecificationBuilder builder;
 
-include::includes/quarkus-hibernate-specification.adoc[leveloffset=+1, opts=optional]
+
+// Blocking
+List<Order> orders = builder.find(Order.class, request);
+----
