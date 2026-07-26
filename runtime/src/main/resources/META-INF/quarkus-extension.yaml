@@ -1,9 +1,13 @@
-name: Hibernate Specification
-#description: Do something useful.
+name: "Hibernate Specification"
+description: "Runtime dynamic Specification / filter builder for Hibernate ORM (blocking)"
 metadata:
-#  keywords:
-#    - hibernate-specification
-#  guide: https://docs.quarkiverse.io/hibernate-specification/dev/ # To create and publish this guide, see https://github.com/quarkiverse/quarkiverse/wiki#documenting-your-extension
-#  categories:
-#    - "miscellaneous"
-#  status: "preview"
+  keywords:
+    - "hibernate"
+    - "specification"
+    - "filter"
+    - "criteria"
+    - "dynamic-query"
+  guide: "https://docs.quarkiverse.io/quarkus-hibernate-specification/dev/"
+  categories:
+    - "data"
+  status: "preview"
