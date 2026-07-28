@@ -1,12 +1,9 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.deployment;
 
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.CriteriaPredicateFactory;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.CriteriaSpecificationEngine;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.FilterValueConverter;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.orm.SpecificationExecutor;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.specification.SelectionSpecificationEngine;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.specification.SpecificationEngineRegistry;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.deployment.Capabilities;
 import io.quarkus.deployment.Capability;
@@ -30,9 +27,6 @@ class HibernateSpecificationProcessor {
         if (capabilities.isPresent(Capability.HIBERNATE_ORM)) {
             beans.produce(AdditionalBeanBuildItem.builder()
                     .addBeanClasses(
-                            CriteriaSpecificationEngine.class,
-                            SelectionSpecificationEngine.class,
-                            SpecificationEngineRegistry.class,
                             SpecificationExecutor.class,
                             CriteriaPredicateFactory.class,
                             FilterValueConverter.class)
