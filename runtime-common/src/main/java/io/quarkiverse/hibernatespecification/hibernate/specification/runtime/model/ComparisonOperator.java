@@ -1,5 +1,7 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 public enum ComparisonOperator {
     EQ,
     NEQ,
@@ -17,5 +19,13 @@ public enum ComparisonOperator {
     NOT_IN,
     BETWEEN,
     IS_NULL,
-    IS_NOT_NULL
+    IS_NOT_NULL;
+
+    @JsonCreator
+    public static ComparisonOperator from(String value) {
+        if (value == null) {
+            throw new IllegalArgumentException("operator is required");
+        }
+        return ComparisonOperator.valueOf(value.trim().toUpperCase().replace('-', '_'));
+    }
 }
