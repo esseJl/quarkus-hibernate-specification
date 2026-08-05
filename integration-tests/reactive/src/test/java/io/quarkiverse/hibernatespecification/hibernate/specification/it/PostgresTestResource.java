@@ -19,7 +19,12 @@ public class PostgresTestResource implements QuarkusTestResourceLifecycleManager
         POSTGRES.start();
 
         Map<String, String> config = new HashMap<>();
-
+        config.put("quarkus.datasource.db-kind", "postgresql");
+        config.put("quarkus.datasource.username", POSTGRES.getUsername());
+        config.put("quarkus.datasource.password", POSTGRES.getPassword());
+        config.put("quarkus.datasource.reactive.url", POSTGRES.getJdbcUrl().replace("jdbc:", "vertx-reactive:"));
+        // config.put("quarkus.datasource.jdbc.url", POSTGRES.getJdbcUrl());
+        config.put("quarkus.hibernate-orm.database.generation", "drop-and-create");
         return config;
     }
 

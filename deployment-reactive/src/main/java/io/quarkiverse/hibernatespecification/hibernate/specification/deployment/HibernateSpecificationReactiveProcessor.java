@@ -1,9 +1,7 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.deployment;
 
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.CriteriaPredicateFactory;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.FilterValueConverter;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.reactive.ReactiveSpecificationExecutor;
+import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.*;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.deployment.Capabilities;
 import io.quarkus.deployment.Capability;
@@ -28,9 +26,11 @@ class HibernateSpecificationReactiveProcessor {
         if (capabilities.isPresent(Capability.HIBERNATE_REACTIVE)) {
             beans.produce(AdditionalBeanBuildItem.builder()
                     .addBeanClasses(
-                            ReactiveSpecificationExecutor.class,
-                            CriteriaPredicateFactory.class,
-                            FilterValueConverter.class)
+                            FieldMetaRegistry.class,
+                            PathResolver.class,
+                            ValueConverter.class,
+                            DtoMapperHelper.class,
+                            SpecificationBuilder.class)
                     .setUnremovable()
                     .build());
         }
@@ -39,6 +39,7 @@ class HibernateSpecificationReactiveProcessor {
     @BuildStep
     ReflectiveClassBuildItem registerForReflection() {
         return ReflectiveClassBuildItem.builder(
+
                 QueryRequest.class,
                 FilterNode.class,
                 FilterPredicate.class,
@@ -47,11 +48,15 @@ class HibernateSpecificationReactiveProcessor {
                 SingleValue.class,
                 MultiValue.class,
                 RangeValue.class,
+                PageResponse.class,
+                // enums
                 ComparisonOperator.class,
                 LogicalOperator.class,
                 SortDirection.class,
                 FilterNode.NodeType.class,
                 FilterValue.ValueType.class,
+                FieldMeta.class,
+                // page & sort
                 PageRequest.class,
                 SortRequest.class).methods(true).fields(true).build();
     }

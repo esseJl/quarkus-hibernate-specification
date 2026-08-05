@@ -2,26 +2,15 @@ package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.mo
 
 import java.util.List;
 
-public record QueryRequest(
-        FilterNode filter,
-        List<SortRequest> sort,
-        PageRequest page) {
+public record QueryRequest(FilterNode filter, List<SortRequest> sort, PageRequest page) {
 
     public QueryRequest {
-        sort = sort == null
-                ? List.of()
-                : List.copyOf(sort);
+        sort = sort == null ? List.of() : List.copyOf(sort);
 
-        page = page == null
-                ? PageRequest.firstPage()
-                : page;
+        page = page == null ? PageRequest.firstPage() : page;
     }
 
-    public static QueryRequest of(
-            FilterNode filter) {
-        return new QueryRequest(
-                filter,
-                List.of(),
-                PageRequest.firstPage());
+    public static QueryRequest of(FilterNode filter) {
+        return new QueryRequest(filter, List.of(), PageRequest.firstPage());
     }
 }

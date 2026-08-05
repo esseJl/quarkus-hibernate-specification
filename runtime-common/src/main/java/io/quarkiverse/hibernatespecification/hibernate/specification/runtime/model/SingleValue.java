@@ -2,8 +2,7 @@ package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.mo
 
 import java.util.Objects;
 
-public record SingleValue(
-        Object value) implements FilterValue {
+public record SingleValue(Object value) implements FilterValue {
 
     public SingleValue {
         Objects.requireNonNull(value, "value must not be null");

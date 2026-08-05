@@ -12,8 +12,7 @@ public record MultiValue(
         values = List.copyOf(values);
 
         if (values.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "values must not be empty");
+            throw new IllegalArgumentException("values must not be empty");
         }
     }
 

@@ -1,9 +1,7 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.deployment;
 
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.CriteriaPredicateFactory;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.criteria.FilterValueConverter;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.orm.SpecificationExecutor;
+import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.*;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.deployment.Capabilities;
 import io.quarkus.deployment.Capability;
@@ -27,9 +25,11 @@ class HibernateSpecificationProcessor {
         if (capabilities.isPresent(Capability.HIBERNATE_ORM)) {
             beans.produce(AdditionalBeanBuildItem.builder()
                     .addBeanClasses(
-                            SpecificationExecutor.class,
-                            CriteriaPredicateFactory.class,
-                            FilterValueConverter.class)
+                            FieldMetaRegistry.class,
+                            PathResolver.class,
+                            ValueConverter.class,
+                            DtoMapperHelper.class,
+                            SpecificationBuilder.class)
                     .setUnremovable()
                     .build());
         }
@@ -54,6 +54,7 @@ class HibernateSpecificationProcessor {
                 SortDirection.class,
                 FilterNode.NodeType.class,
                 FilterValue.ValueType.class,
+                FieldMeta.class,
                 // page & sort
                 PageRequest.class,
                 SortRequest.class).methods(true).fields(true).build();

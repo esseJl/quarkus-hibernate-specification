@@ -2,9 +2,7 @@ package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.mo
 
 import java.util.Objects;
 
-public record SortRequest(
-        String field,
-        SortDirection direction) {
+public record SortRequest(String field, SortDirection direction) {
 
     public SortRequest {
         Objects.requireNonNull(field);
@@ -16,17 +14,12 @@ public record SortRequest(
         }
     }
 
-    public static SortRequest asc(
-            String field) {
-        return new SortRequest(
-                field,
-                SortDirection.ASC);
+    public static SortRequest asc(String field) {
+        return new SortRequest(field, SortDirection.ASC);
     }
 
     public static SortRequest desc(
             String field) {
-        return new SortRequest(
-                field,
-                SortDirection.DESC);
+        return new SortRequest(field, SortDirection.DESC);
     }
 }
