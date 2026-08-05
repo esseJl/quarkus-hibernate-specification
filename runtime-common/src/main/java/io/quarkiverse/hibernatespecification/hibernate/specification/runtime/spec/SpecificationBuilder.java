@@ -55,7 +55,7 @@ public class SpecificationBuilder {
 
         return ctx -> {
             JoinContext joinCtx = new JoinContext();
-            return this.<T>buildPredicateWithJoin(request, dtoOrEntity, joinCtx).apply(ctx);
+            return this.<T> buildPredicateWithJoin(request, dtoOrEntity, joinCtx).apply(ctx);
         };
     }
 
@@ -73,7 +73,7 @@ public class SpecificationBuilder {
         return ctx -> {
             // شمارنده‌ی گره‌ها به‌صورت محلی برای هر اجرای تابع ساخته می‌شود (نه فیلد کلاس)،
             // پس علی‌رغم mutable بودن، بین درخواست‌های هم‌زمان به اشتراک گذاشته نمی‌شود و thread-safe است.
-            int[] nodeBudget = {maxFilterNodes};
+            int[] nodeBudget = { maxFilterNodes };
             Predicate predicate = buildNode(rootNode, ctx.root(), ctx.cb(), dtoOrEntity, joinCtx, 0, nodeBudget);
 
             if (joinCtx.hasCollectionJoin() && ctx.query() != null) {
@@ -114,7 +114,7 @@ public class SpecificationBuilder {
     }
 
     private Predicate buildNode(FilterNode node, Root<?> root, CriteriaBuilder cb,
-                                Class<?> dtoOrEntity, JoinContext joinCtx, int depth, int[] nodeBudget) {
+            Class<?> dtoOrEntity, JoinContext joinCtx, int depth, int[] nodeBudget) {
 
         if (node == null) {
             return null;
@@ -135,7 +135,7 @@ public class SpecificationBuilder {
     }
 
     private Predicate buildGroup(FilterGroup group, Root<?> root, CriteriaBuilder cb,
-                                 Class<?> dtoOrEntity, JoinContext joinCtx, int depth, int[] nodeBudget) {
+            Class<?> dtoOrEntity, JoinContext joinCtx, int depth, int[] nodeBudget) {
 
         List<FilterNode> children = group.children();
         if (children.isEmpty()) {
@@ -168,7 +168,7 @@ public class SpecificationBuilder {
         return (op == LogicalOperator.OR) ? cb.or(arr) : cb.and(arr);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private Predicate buildSinglePredicate(
             FilterPredicate predicate,
             Root<?> root,
@@ -289,7 +289,7 @@ public class SpecificationBuilder {
                 .replace("_", "\\_");
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private Predicate buildComparable(CriteriaBuilder cb, Path<?> path, Object value, Comparison comp) {
         if (!(value instanceof Comparable c)) {
             throw new IllegalArgumentException(

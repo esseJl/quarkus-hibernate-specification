@@ -23,7 +23,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     private final Mutiny.SessionFactory sessionFactory;
 
     protected ReactiveQueryService(Mutiny.SessionFactory sessionFactory, SpecificationBuilder specBuilder,
-                                   DtoMapperHelper dtoMapperHelper, Class<T> entityClass) {
+            DtoMapperHelper dtoMapperHelper, Class<T> entityClass) {
         super(specBuilder, dtoMapperHelper, entityClass);
         this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory must not be null");
     }
@@ -40,7 +40,8 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         final boolean isDtoProjection = dtoOrEntity != null
                 && dtoOrEntity.isAnnotationPresent(DtoMapper.class);
 
-        @SuppressWarnings("unchecked") final Class<T> rootEntity = isDtoProjection
+        @SuppressWarnings("unchecked")
+        final Class<T> rootEntity = isDtoProjection
                 ? (Class<T>) specBuilder.resolveEntityClass(dtoOrEntity)
                 : entityClass;
 
@@ -59,7 +60,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
 
     @SuppressWarnings("unchecked")
     private <R> Uni<PageResponse<R>> executeEntity(QueryRequest request, QueryRequest clientOnlyRequest,
-                                                   QueryRequest internalRequest, int page, int size, int offset, Class<T> rootEntity) {
+            QueryRequest internalRequest, int page, int size, int offset, Class<T> rootEntity) {
 
         return sessionFactory.withSession(session -> {
             final JoinContext joinCtx = new JoinContext();
@@ -81,8 +82,8 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     }
 
     private Uni<List<T>> fetchEntities(Mutiny.Session session, QueryRequest request,
-                                       QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
-                                       Class<T> rootEntity, JoinContext joinCtx) {
+            QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
+            Class<T> rootEntity, JoinContext joinCtx) {
 
         final Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(clientOnlyRequest,
                 null, joinCtx);
@@ -109,7 +110,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     }
 
     private <D> Uni<PageResponse<D>> executeProjected(QueryRequest request, QueryRequest clientOnlyRequest,
-                                                      QueryRequest internalRequest, int page, int size, int offset, Class<?> dtoClass, Class<T> rootEntity) {
+            QueryRequest internalRequest, int page, int size, int offset, Class<?> dtoClass, Class<T> rootEntity) {
 
         return sessionFactory.withSession(session -> {
             final JoinContext joinCtx = new JoinContext();
@@ -120,7 +121,8 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
 
                         // FIX: shortcut شمارش، دقیقاً هم‌راستا با نسخه‌ی blocking (findProjected).
                         if (page == 0 && tuples.size() < size && !joinCtx.hasCollectionJoin()) {
-                            @SuppressWarnings("unchecked") final List<D> content = tuples.stream()
+                            @SuppressWarnings("unchecked")
+                            final List<D> content = tuples.stream()
                                     .map(t -> dtoMapperHelper.mapTupleToDto(t, (Class<D>) dtoClass, metas))
                                     .collect(Collectors.toList());
                             return Uni.createFrom().item(
@@ -129,7 +131,8 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
 
                         return count(session, clientOnlyRequest, internalRequest, dtoClass, rootEntity)
                                 .map(total -> {
-                                    @SuppressWarnings("unchecked") final List<D> content = tuples.stream()
+                                    @SuppressWarnings("unchecked")
+                                    final List<D> content = tuples.stream()
                                             .map(t -> dtoMapperHelper.mapTupleToDto(t, (Class<D>) dtoClass, metas))
                                             .collect(Collectors.toList());
 
@@ -140,8 +143,8 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     }
 
     private Uni<List<Tuple>> fetchProjected(Mutiny.Session session, QueryRequest request,
-                                            QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
-                                            Class<?> dtoClass, Class<T> rootEntity, JoinContext joinCtx) {
+            QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
+            Class<?> dtoClass, Class<T> rootEntity, JoinContext joinCtx) {
 
         final Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(clientOnlyRequest,
                 dtoClass, joinCtx);
@@ -179,7 +182,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     }
 
     private Uni<Long> count(Mutiny.Session session, QueryRequest clientRequest,
-                            QueryRequest internalRequest, Class<?> dtoOrEntity, Class<T> rootEntity) {
+            QueryRequest internalRequest, Class<?> dtoOrEntity, Class<T> rootEntity) {
 
         final JoinContext countJoinCtx = new JoinContext();
 
