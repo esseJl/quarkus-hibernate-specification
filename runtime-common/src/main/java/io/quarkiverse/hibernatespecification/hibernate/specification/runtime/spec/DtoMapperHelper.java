@@ -16,6 +16,10 @@ public class DtoMapperHelper {
 
     private final ConcurrentHashMap<Class<?>, ConcurrentHashMap<String, Field>> fieldCache = new ConcurrentHashMap<>();
 
+    // FIX: کش thread-safe برای constructor کانونیکِ رکوردها تا هم باگ زیر رفع شود
+    // و هم reflection lookup هزینه‌بر برای هر ردیف/tuple تکرار نشود.
+    private final ConcurrentHashMap<Class<?>, Constructor<?>> canonicalCtorCache = new ConcurrentHashMap<>();
+
     public <D> D mapTupleToDto(Tuple tuple, Class<D> dtoClass, List<FieldMeta> metas) {
         try {
             if (dtoClass.isRecord()) {
@@ -36,18 +40,31 @@ public class DtoMapperHelper {
         }
     }
 
+    /**
+     * FIX (باگ): نسخه‌ی قبلی با {@code dtoClass.getDeclaredConstructors()[0]} اولین
+     * constructor برگشتی از JVM را انتخاب می‌کرد. ترتیب آرایه‌ی
+     * {@code getDeclaredConstructors()} در جاوا هیچ تضمین مستندشده‌ای ندارد؛ اگر
+     * DTO رکورد یک constructor کمکی (غیر canonical) هم داشته باشد - چیزی که در
+     * رکوردهای جاوا کاملاً مجاز و رایج است - ممکن بود همان constructor اشتباه
+     * انتخاب و با آرگومان‌های نادرست (تعداد/ترتیب/نوع پارامتر متفاوت) صدا زده شود؛
+     * نتیجه یا ClassCastException/IllegalArgumentException در زمان اجرا بود یا حتی
+     * بدتر، مقداردهی نادرستِ بی‌صدا به فیلدها.
+     * <p>
+     * راه‌حل: constructor کانونیک را دقیقاً بر اساس نوع و تعداد پارامترهای
+     * {@code getRecordComponents()} (که ترتیب آن‌ها توسط JLS تضمین شده) پیدا
+     * می‌کنیم، و نتیجه را برای فراخوانی‌های بعدی کش می‌کنیم.
+     */
     @SuppressWarnings("unchecked")
     private <D> D mapToRecord(Tuple tuple, Class<D> dtoClass, List<FieldMeta> metas) throws Exception {
         RecordComponent[] components = dtoClass.getRecordComponents();
         Object[] args = new Object[components.length];
         for (int i = 0; i < components.length; i++) {
             String name = components[i].getName();
-            // پیدا کردن meta بر اساس dtoName ساده یا کامل
             String alias = SpecificationBuilder.sanitizeAlias(name);
             try {
                 args[i] = tuple.get(alias);
             } catch (IllegalArgumentException ex) {
-                // fallback: سعی با نام کامل از metas
+                // fallback: تلاش با نام کامل از metas
                 args[i] = null;
                 for (FieldMeta m : metas) {
                     if (m.dtoName().equals(name) || m.dtoName().endsWith("." + name)) {
@@ -57,8 +74,22 @@ public class DtoMapperHelper {
                 }
             }
         }
-        Constructor<D> ctor = (Constructor<D>) dtoClass.getDeclaredConstructors()[0];
-        ctor.setAccessible(true);
+
+        Constructor<D> ctor = (Constructor<D>) canonicalCtorCache.computeIfAbsent(dtoClass, cls -> {
+            try {
+                Class<?>[] paramTypes = new Class<?>[components.length];
+                for (int i = 0; i < components.length; i++) {
+                    paramTypes[i] = components[i].getType();
+                }
+                Constructor<?> canonical = cls.getDeclaredConstructor(paramTypes);
+                canonical.setAccessible(true);
+                return canonical;
+            } catch (NoSuchMethodException e) {
+                throw new RuntimeException(
+                        "Canonical constructor not found for record: " + cls.getName(), e);
+            }
+        });
+
         return ctor.newInstance(args);
     }
 

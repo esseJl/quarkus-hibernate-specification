@@ -22,7 +22,6 @@ import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spe
 
 public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
 
-
     private final EntityManager entityManager;
 
     protected QueryService(EntityManager entityManager, SpecificationBuilder specBuilder, DtoMapperHelper dtoMapperHelper,
@@ -89,12 +88,21 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         dataQuery.setMaxResults(size);
         List<T> content = dataQuery.getResultList();
 
-        long total = count(
-                request.filter() == null ? null
-                        : new QueryRequest(request.filter(), List.of(), PageRequest.firstPage()),
-                internalRequest,
-                null,
-                rootEntity);
+        // FIX (سازگاری/بهینه‌سازی): همان shortcut موجود در findProjected این‌جا هم اعمال شد.
+        // اگر صفحه‌ی اول باشد و تعداد نتایج کمتر از سایزِ صفحه باشد (و JOINِ
+        // collection‌ای در کار نباشد)، دیگر نیازی به یک کوئری COUNT جداگانه نیست؛
+        // چون totalElements دقیقاً همان content.size() است.
+        long total;
+        if (page == 0 && content.size() < size && !joinCtx.hasCollectionJoin()) {
+            total = content.size();
+        } else {
+            total = count(
+                    request.filter() == null ? null
+                            : new QueryRequest(request.filter(), List.of(), PageRequest.firstPage()),
+                    internalRequest,
+                    null,
+                    rootEntity);
+        }
 
         return PageResponse.of(content, total, new PageRequest(page, size));
     }

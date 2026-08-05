@@ -33,7 +33,9 @@ public class FieldMetaRegistry {
         Class<?> entityClass = resolveEntityClass(dtoOrEntity);
         return cache.computeIfAbsent(dtoOrEntity, cls -> {
             Map<String, FieldMeta> map = new LinkedHashMap<>();
-            collectFields(cls, "", map, entityClass, new HashSet<>());
+            // Set خالی فقط برای شروعِ مسیر ریشه؛ در هر شاخه یک کپیِ مستقل از آن ساخته می‌شود
+            // تا تشخیصِ چرخه (cycle) صرفاً محدود به همان مسیر/شاخه بماند، نه کل درخت.
+            collectFields(cls, "", map, entityClass, Set.of());
             return Collections.unmodifiableMap(map);
         });
     }
@@ -81,6 +83,22 @@ public class FieldMetaRegistry {
         return meta;
     }
 
+    /**
+     * FIX (باگ حیاتی): پارامتر {@code visited} پیش از این به‌صورت یک شیء Set مشترک و mutable
+     * در کل درخت پیمایش (شامل تمام فیلدهای خواهر/برادر) دست‌به‌دست می‌شد.
+     * <p>
+     * نتیجه: اگر یک نوع پیچیده (مثلاً {@code Address}) از طریق دو فیلد مختلف در همان کلاس
+     * ارجاع می‌شد (مثلاً {@code homeAddress} و {@code workAddress})، به محض پردازش اولین
+     * فیلد، کلاس Address برای همیشه (در کل درخت، نه فقط همان شاخه) در visited علامت می‌خورد
+     * و زیرفیلدهای شاخه‌ی دوم (مثل {@code workAddress.street}) هرگز به نقشه‌ی فیلدهای مجاز
+     * اضافه نمی‌شدند؛ در نتیجه فیلتر/سورت روی {@code workAddress.street} با خطای
+     * «فیلد جزو projection نیست» رد می‌شد، درحالی‌که کاملاً معتبر بود.
+     * <p>
+     * راه‌حل: به‌جای اشتراک‌گذاری همان reference، در ابتدای هر فراخوانی یک کپیِ محلی
+     * از visited ساخته می‌شود. این کپی هنوز جلوی بازگشت بی‌نهایت (self-reference /
+     * cycle) در طول یک مسیر واحد را می‌گیرد، اما دیگر باعث نادیده گرفتن شاخه‌های خواهر
+     * که به همان کلاس اشاره می‌کنند نمی‌شود.
+     */
     private void collectFields(
             Class<?> clazz,
             String prefix,
@@ -91,9 +109,11 @@ public class FieldMetaRegistry {
         if (clazz == null || clazz == Object.class || visited.contains(clazz)) {
             return;
         }
-        visited.add(clazz);
 
-        collectFields(clazz.getSuperclass(), prefix, out, entityClass, visited);
+        Set<Class<?>> pathVisited = new HashSet<>(visited);
+        pathVisited.add(clazz);
+
+        collectFields(clazz.getSuperclass(), prefix, out, entityClass, pathVisited);
 
         for (Field f : clazz.getDeclaredFields()) {
             if (Modifier.isStatic(f.getModifiers()) || f.isSynthetic()) {
@@ -125,7 +145,7 @@ public class FieldMetaRegistry {
 
             Class<?> fieldType = f.getType();
             if (isComplexType(fieldType)) {
-                collectFields(fieldType, dtoName, out, entityClass, visited);
+                collectFields(fieldType, dtoName, out, entityClass, pathVisited);
             }
         }
     }

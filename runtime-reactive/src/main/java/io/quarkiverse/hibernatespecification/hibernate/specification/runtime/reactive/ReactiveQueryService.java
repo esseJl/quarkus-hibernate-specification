@@ -40,8 +40,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         final boolean isDtoProjection = dtoOrEntity != null
                 && dtoOrEntity.isAnnotationPresent(DtoMapper.class);
 
-        @SuppressWarnings("unchecked")
-        final Class<T> rootEntity = isDtoProjection
+        @SuppressWarnings("unchecked") final Class<T> rootEntity = isDtoProjection
                 ? (Class<T>) specBuilder.resolveEntityClass(dtoOrEntity)
                 : entityClass;
 
@@ -62,17 +61,28 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     private <R> Uni<PageResponse<R>> executeEntity(QueryRequest request, QueryRequest clientOnlyRequest,
                                                    QueryRequest internalRequest, int page, int size, int offset, Class<T> rootEntity) {
 
-        return sessionFactory.withSession(session -> fetchEntities(session, request, clientOnlyRequest,
-                internalRequest, offset, size, rootEntity)
-                .chain(items -> count(session, clientOnlyRequest, internalRequest, null, rootEntity)
-                        .map(total -> PageResponse.of((List<R>) items, total, new PageRequest(page, size)))));
+        return sessionFactory.withSession(session -> {
+            final JoinContext joinCtx = new JoinContext();
+            return fetchEntities(session, request, clientOnlyRequest, internalRequest, offset, size, rootEntity, joinCtx)
+                    .chain(items -> {
+                        // FIX (سازگاری/بهینه‌سازی): همان shortcut که در نسخه‌ی blocking برای
+                        // findProjected وجود داشت اما این‌جا نبود. اگر صفحه‌ی اول باشد و تعداد
+                        // نتایج کمتر از سایزِ صفحه باشد (و JOINِ collection‌ای در کار نباشد)،
+                        // یعنی داده‌ی بیشتری برای شمارش وجود ندارد و نیازی به یک کوئری COUNT
+                        // جداگانه (یک round-trip اضافه‌ی شبکه به دیتابیس) نیست.
+                        if (page == 0 && items.size() < size && !joinCtx.hasCollectionJoin()) {
+                            return Uni.createFrom().item(
+                                    PageResponse.of((List<R>) items, items.size(), new PageRequest(page, size)));
+                        }
+                        return count(session, clientOnlyRequest, internalRequest, null, rootEntity)
+                                .map(total -> PageResponse.of((List<R>) items, total, new PageRequest(page, size)));
+                    });
+        });
     }
 
     private Uni<List<T>> fetchEntities(Mutiny.Session session, QueryRequest request,
                                        QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
-                                       Class<T> rootEntity) {
-
-        final JoinContext joinCtx = new JoinContext();
+                                       Class<T> rootEntity, JoinContext joinCtx) {
 
         final Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(clientOnlyRequest,
                 null, joinCtx);
@@ -101,25 +111,37 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     private <D> Uni<PageResponse<D>> executeProjected(QueryRequest request, QueryRequest clientOnlyRequest,
                                                       QueryRequest internalRequest, int page, int size, int offset, Class<?> dtoClass, Class<T> rootEntity) {
 
-        return sessionFactory.withSession(session -> fetchProjected(session, request, clientOnlyRequest,
-                internalRequest, offset, size, dtoClass, rootEntity)
-                .chain(tuples -> count(session, clientOnlyRequest, internalRequest, dtoClass, rootEntity)
-                        .map(total -> {
-                            final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
-                            @SuppressWarnings("unchecked")
-                            final List<D> content = tuples.stream()
+        return sessionFactory.withSession(session -> {
+            final JoinContext joinCtx = new JoinContext();
+            return fetchProjected(session, request, clientOnlyRequest, internalRequest, offset, size, dtoClass, rootEntity,
+                    joinCtx)
+                    .chain(tuples -> {
+                        final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
+
+                        // FIX: shortcut شمارش، دقیقاً هم‌راستا با نسخه‌ی blocking (findProjected).
+                        if (page == 0 && tuples.size() < size && !joinCtx.hasCollectionJoin()) {
+                            @SuppressWarnings("unchecked") final List<D> content = tuples.stream()
                                     .map(t -> dtoMapperHelper.mapTupleToDto(t, (Class<D>) dtoClass, metas))
                                     .collect(Collectors.toList());
+                            return Uni.createFrom().item(
+                                    PageResponse.of(content, tuples.size(), new PageRequest(page, size)));
+                        }
 
-                            return PageResponse.of(content, total, new PageRequest(page, size));
-                        })));
+                        return count(session, clientOnlyRequest, internalRequest, dtoClass, rootEntity)
+                                .map(total -> {
+                                    @SuppressWarnings("unchecked") final List<D> content = tuples.stream()
+                                            .map(t -> dtoMapperHelper.mapTupleToDto(t, (Class<D>) dtoClass, metas))
+                                            .collect(Collectors.toList());
+
+                                    return PageResponse.of(content, total, new PageRequest(page, size));
+                                });
+                    });
+        });
     }
 
     private Uni<List<Tuple>> fetchProjected(Mutiny.Session session, QueryRequest request,
                                             QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
-                                            Class<?> dtoClass, Class<T> rootEntity) {
-
-        final JoinContext joinCtx = new JoinContext();
+                                            Class<?> dtoClass, Class<T> rootEntity, JoinContext joinCtx) {
 
         final Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(clientOnlyRequest,
                 dtoClass, joinCtx);

@@ -20,6 +20,14 @@ public class SpecificationBuilder {
     @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-depth", defaultValue = "32")
     private int maxFilterDepth;
 
+    // FIX: قبلاً فقط عمق (depth) درخت فیلتر محدود می‌شد. یک کلاینت مخرب می‌توانست
+    // یک FilterGroup تخت (depth=1) با صدها هزار child بسازد که هیچ‌کدام از حد عمق
+    // رد نمی‌شدند اما پردازش آن‌ها (ساخت Predicate برای هر کدام + آرایه‌ی نهایی)
+    // می‌توانست CPU/Heap زیادی مصرف کند - یک نوع Algorithmic Complexity DoS.
+    // این مقدار، سقفِ کل تعداد گره‌های قابل پردازش در یک درخواست را تعیین می‌کند.
+    @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-nodes", defaultValue = "1000")
+    private int maxFilterNodes;
+
     private final FieldMetaRegistry fieldMetaRegistry;
     private final ValueConverter valueConverter;
     private final PathResolver pathResolver;
@@ -47,7 +55,7 @@ public class SpecificationBuilder {
 
         return ctx -> {
             JoinContext joinCtx = new JoinContext();
-            return this.<T> buildPredicateWithJoin(request, dtoOrEntity, joinCtx).apply(ctx);
+            return this.<T>buildPredicateWithJoin(request, dtoOrEntity, joinCtx).apply(ctx);
         };
     }
 
@@ -63,7 +71,10 @@ public class SpecificationBuilder {
         final FilterNode rootNode = request.filter();
 
         return ctx -> {
-            Predicate predicate = buildNode(rootNode, ctx.root(), ctx.cb(), dtoOrEntity, joinCtx, 0);
+            // شمارنده‌ی گره‌ها به‌صورت محلی برای هر اجرای تابع ساخته می‌شود (نه فیلد کلاس)،
+            // پس علی‌رغم mutable بودن، بین درخواست‌های هم‌زمان به اشتراک گذاشته نمی‌شود و thread-safe است.
+            int[] nodeBudget = {maxFilterNodes};
+            Predicate predicate = buildNode(rootNode, ctx.root(), ctx.cb(), dtoOrEntity, joinCtx, 0, nodeBudget);
 
             if (joinCtx.hasCollectionJoin() && ctx.query() != null) {
                 ctx.query().distinct(true);
@@ -103,7 +114,7 @@ public class SpecificationBuilder {
     }
 
     private Predicate buildNode(FilterNode node, Root<?> root, CriteriaBuilder cb,
-            Class<?> dtoOrEntity, JoinContext joinCtx, int depth) {
+                                Class<?> dtoOrEntity, JoinContext joinCtx, int depth, int[] nodeBudget) {
 
         if (node == null) {
             return null;
@@ -112,15 +123,19 @@ public class SpecificationBuilder {
             throw new SpecificationException(
                     "Filter tree exceeds maximum allowed depth of " + maxFilterDepth);
         }
+        if (--nodeBudget[0] < 0) {
+            throw new SpecificationException(
+                    "Filter tree exceeds maximum allowed number of nodes of " + maxFilterNodes);
+        }
 
         return switch (node.type()) {
             case PREDICATE -> buildSinglePredicate((FilterPredicate) node, root, cb, dtoOrEntity, joinCtx);
-            case GROUP -> buildGroup((FilterGroup) node, root, cb, dtoOrEntity, joinCtx, depth + 1);
+            case GROUP -> buildGroup((FilterGroup) node, root, cb, dtoOrEntity, joinCtx, depth + 1, nodeBudget);
         };
     }
 
     private Predicate buildGroup(FilterGroup group, Root<?> root, CriteriaBuilder cb,
-            Class<?> dtoOrEntity, JoinContext joinCtx, int depth) {
+                                 Class<?> dtoOrEntity, JoinContext joinCtx, int depth, int[] nodeBudget) {
 
         List<FilterNode> children = group.children();
         if (children.isEmpty()) {
@@ -130,13 +145,13 @@ public class SpecificationBuilder {
         LogicalOperator op = group.operator();
 
         if (op == LogicalOperator.NOT) {
-            Predicate child = buildNode(children.get(0), root, cb, dtoOrEntity, joinCtx, depth);
+            Predicate child = buildNode(children.get(0), root, cb, dtoOrEntity, joinCtx, depth, nodeBudget);
             return child == null ? cb.conjunction() : cb.not(child);
         }
 
         List<Predicate> predicates = new ArrayList<>(children.size());
         for (FilterNode child : children) {
-            Predicate p = buildNode(child, root, cb, dtoOrEntity, joinCtx, depth);
+            Predicate p = buildNode(child, root, cb, dtoOrEntity, joinCtx, depth, nodeBudget);
             if (p != null) {
                 predicates.add(p);
             }
@@ -153,7 +168,7 @@ public class SpecificationBuilder {
         return (op == LogicalOperator.OR) ? cb.or(arr) : cb.and(arr);
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private Predicate buildSinglePredicate(
             FilterPredicate predicate,
             Root<?> root,
@@ -274,7 +289,7 @@ public class SpecificationBuilder {
                 .replace("_", "\\_");
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private Predicate buildComparable(CriteriaBuilder cb, Path<?> path, Object value, Comparison comp) {
         if (!(value instanceof Comparable c)) {
             throw new IllegalArgumentException(
