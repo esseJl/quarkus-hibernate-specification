@@ -21,17 +21,11 @@ import io.smallrye.mutiny.Uni;
 public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
 
     private final Mutiny.SessionFactory sessionFactory;
-    private final SpecificationBuilder specBuilder;
-    private final DtoMapperHelper dtoMapperHelper;
-    private final Class<T> entityClass;
 
     protected ReactiveQueryService(Mutiny.SessionFactory sessionFactory, SpecificationBuilder specBuilder,
-            DtoMapperHelper dtoMapperHelper, Class<T> entityClass) {
+                                   DtoMapperHelper dtoMapperHelper, Class<T> entityClass) {
         super(specBuilder, dtoMapperHelper, entityClass);
-        this.sessionFactory = Objects.requireNonNull(sessionFactory);
-        this.specBuilder = Objects.requireNonNull(specBuilder);
-        this.dtoMapperHelper = Objects.requireNonNull(dtoMapperHelper);
-        this.entityClass = Objects.requireNonNull(entityClass);
+        this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory must not be null");
     }
 
     protected abstract QueryRequest initFiltersAndSorts();
@@ -39,8 +33,9 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     public <R> Uni<PageResponse<R>> query(QueryRequest request, Class<R> dtoOrEntity) {
         final QueryRequest safeRequest = request != null ? request : QueryRequest.of(null);
         final PageRequest pageReq = safeRequest.page();
-        final int page = Math.max(0, pageReq.page());
+        final int page = pageReq.page();
         final int size = pageReq.size();
+        final int offset = pageReq.offset();
 
         final boolean isDtoProjection = dtoOrEntity != null
                 && dtoOrEntity.isAnnotationPresent(DtoMapper.class);
@@ -57,26 +52,25 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
 
         if (isDtoProjection) {
             return executeProjected(safeRequest, clientOnlyRequest, internalRequest,
-                    page, size, dtoOrEntity, rootEntity);
+                    page, size, offset, dtoOrEntity, rootEntity);
         }
         return executeEntity(safeRequest, clientOnlyRequest, internalRequest,
-                page, size, rootEntity);
+                page, size, offset, rootEntity);
     }
 
     @SuppressWarnings("unchecked")
     private <R> Uni<PageResponse<R>> executeEntity(QueryRequest request, QueryRequest clientOnlyRequest,
-            QueryRequest internalRequest, int page, int size, Class<T> rootEntity) {
+                                                   QueryRequest internalRequest, int page, int size, int offset, Class<T> rootEntity) {
 
-        return sessionFactory.withSession(session -> Uni.combine().all()
-                .unis(fetchEntities(session, request, clientOnlyRequest, internalRequest, page, size, rootEntity),
-                        count(session, clientOnlyRequest, internalRequest, null, rootEntity))
-                .asTuple()
-                .map(tuple -> PageResponse.of((List<R>) tuple.getItem1(), tuple.getItem2(), new PageRequest(page, size))));
+        return sessionFactory.withSession(session -> fetchEntities(session, request, clientOnlyRequest,
+                internalRequest, offset, size, rootEntity)
+                .chain(items -> count(session, clientOnlyRequest, internalRequest, null, rootEntity)
+                        .map(total -> PageResponse.of((List<R>) items, total, new PageRequest(page, size)))));
     }
 
     private Uni<List<T>> fetchEntities(Mutiny.Session session, QueryRequest request,
-            QueryRequest clientOnlyRequest, QueryRequest internalRequest, int page, int size,
-            Class<T> rootEntity) {
+                                       QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
+                                       Class<T> rootEntity) {
 
         final JoinContext joinCtx = new JoinContext();
 
@@ -99,35 +93,31 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         }
 
         return session.createQuery(cq)
-                .setFirstResult(page * size)
+                .setFirstResult(offset)
                 .setMaxResults(size)
                 .getResultList();
     }
 
     private <D> Uni<PageResponse<D>> executeProjected(QueryRequest request, QueryRequest clientOnlyRequest,
-            QueryRequest internalRequest, int page, int size, Class<?> dtoClass, Class<T> rootEntity) {
+                                                      QueryRequest internalRequest, int page, int size, int offset, Class<?> dtoClass, Class<T> rootEntity) {
 
-        return sessionFactory.withSession(session -> Uni.combine().all()
-                .unis(fetchProjected(session, request, clientOnlyRequest, internalRequest, page, size,
-                        dtoClass, rootEntity),
-                        count(session, clientOnlyRequest, internalRequest, dtoClass, rootEntity))
-                .asTuple()
-                .map(tuple -> {
-                    final List<Tuple> tuples = tuple.getItem1();
-                    long total = tuple.getItem2();
+        return sessionFactory.withSession(session -> fetchProjected(session, request, clientOnlyRequest,
+                internalRequest, offset, size, dtoClass, rootEntity)
+                .chain(tuples -> count(session, clientOnlyRequest, internalRequest, dtoClass, rootEntity)
+                        .map(total -> {
+                            final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
+                            @SuppressWarnings("unchecked")
+                            final List<D> content = tuples.stream()
+                                    .map(t -> dtoMapperHelper.mapTupleToDto(t, (Class<D>) dtoClass, metas))
+                                    .collect(Collectors.toList());
 
-                    final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
-                    final List<D> content = tuples.stream()
-                            .map(t -> dtoMapperHelper.mapTupleToDto(t, (Class<D>) dtoClass, metas))
-                            .collect(Collectors.toList());
-
-                    return PageResponse.of(content, total, new PageRequest(page, size));
-                }));
+                            return PageResponse.of(content, total, new PageRequest(page, size));
+                        })));
     }
 
     private Uni<List<Tuple>> fetchProjected(Mutiny.Session session, QueryRequest request,
-            QueryRequest clientOnlyRequest, QueryRequest internalRequest, int page, int size,
-            Class<?> dtoClass, Class<T> rootEntity) {
+                                            QueryRequest clientOnlyRequest, QueryRequest internalRequest, int offset, int size,
+                                            Class<?> dtoClass, Class<T> rootEntity) {
 
         final JoinContext joinCtx = new JoinContext();
 
@@ -161,13 +151,13 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         applySort(cq, root, cb, request.sort(), dtoClass, joinCtx);
 
         return session.createQuery(cq)
-                .setFirstResult(page * size)
+                .setFirstResult(offset)
                 .setMaxResults(size)
                 .getResultList();
     }
 
     private Uni<Long> count(Mutiny.Session session, QueryRequest clientRequest,
-            QueryRequest internalRequest, Class<?> dtoOrEntity, Class<T> rootEntity) {
+                            QueryRequest internalRequest, Class<?> dtoOrEntity, Class<T> rootEntity) {
 
         final JoinContext countJoinCtx = new JoinContext();
 

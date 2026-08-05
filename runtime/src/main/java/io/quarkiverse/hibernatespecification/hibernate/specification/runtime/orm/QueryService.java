@@ -22,18 +22,13 @@ import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spe
 
 public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
 
+
     private final EntityManager entityManager;
-    private final SpecificationBuilder specBuilder;
-    private final DtoMapperHelper dtoMapperHelper;
-    private final Class<T> entityClass;
 
     protected QueryService(EntityManager entityManager, SpecificationBuilder specBuilder, DtoMapperHelper dtoMapperHelper,
-            Class<T> entityClass) {
+                           Class<T> entityClass) {
         super(specBuilder, dtoMapperHelper, entityClass);
-        this.entityManager = Objects.requireNonNull(entityManager);
-        this.specBuilder = Objects.requireNonNull(specBuilder);
-        this.dtoMapperHelper = Objects.requireNonNull(dtoMapperHelper);
-        this.entityClass = Objects.requireNonNull(entityClass);
+        this.entityManager = Objects.requireNonNull(entityManager, "entityManager must not be null");
     }
 
     protected abstract QueryRequest initFiltersAndSorts();
@@ -45,6 +40,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         PageRequest pageReq = safeRequest.page();
         int page = pageReq.page();
         int size = pageReq.size();
+        int offset = pageReq.offset();
 
         boolean isDtoProjection = dtoOrEntity != null && dtoOrEntity.isAnnotationPresent(DtoMapper.class);
         Class<T> rootEntity = isDtoProjection
@@ -59,21 +55,21 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
 
         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = safeRequest.filter() == null ? null
                 : specBuilder.buildPredicateWithJoin(
-                        new QueryRequest(safeRequest.filter(), List.of(), PageRequest.firstPage()),
-                        dtoOrEntity, joinCtx);
+                new QueryRequest(safeRequest.filter(), List.of(), PageRequest.firstPage()),
+                dtoOrEntity, joinCtx);
 
         if (isDtoProjection) {
-            return findProjected(safeRequest, clientPred, internalPred, joinCtx, page, size,
+            return findProjected(safeRequest, clientPred, internalPred, joinCtx, page, size, offset,
                     dtoOrEntity, rootEntity, internalRequest);
         }
         return (PageResponse<R>) findEntities(safeRequest, clientPred, internalPred, joinCtx,
-                page, size, rootEntity, internalRequest);
+                page, size, offset, rootEntity, internalRequest);
     }
 
     private PageResponse<T> findEntities(QueryRequest request,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred,
-            JoinContext joinCtx, int page, int size, Class<T> rootEntity, QueryRequest internalRequest) {
+                                         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred,
+                                         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred,
+                                         JoinContext joinCtx, int page, int size, int offset, Class<T> rootEntity, QueryRequest internalRequest) {
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<T> cq = cb.createQuery(rootEntity);
@@ -89,7 +85,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         }
 
         TypedQuery<T> dataQuery = entityManager.createQuery(cq);
-        dataQuery.setFirstResult(page * size);
+        dataQuery.setFirstResult(offset);
         dataQuery.setMaxResults(size);
         List<T> content = dataQuery.getResultList();
 
@@ -105,10 +101,10 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
 
     @SuppressWarnings("unchecked")
     private <D> PageResponse<D> findProjected(QueryRequest request,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred,
-            JoinContext joinCtx, int page, int size, Class<?> dtoClass, Class<T> rootEntity,
-            QueryRequest internalRequest) {
+                                              Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred,
+                                              Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred,
+                                              JoinContext joinCtx, int page, int size, int offset, Class<?> dtoClass, Class<T> rootEntity,
+                                              QueryRequest internalRequest) {
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Tuple> cq = cb.createTupleQuery();
@@ -132,7 +128,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         applySort(cq, root, cb, request.sort(), dtoClass, joinCtx);
 
         TypedQuery<Tuple> dataQuery = entityManager.createQuery(cq);
-        dataQuery.setFirstResult(page * size);
+        dataQuery.setFirstResult(offset);
         dataQuery.setMaxResults(size);
         List<Tuple> tuples = dataQuery.getResultList();
 
@@ -141,7 +137,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
             total = tuples.size();
         } else {
             total = count(request.filter() == null ? null
-                    : new QueryRequest(request.filter(), List.of(), PageRequest.firstPage()), internalRequest, dtoClass,
+                            : new QueryRequest(request.filter(), List.of(), PageRequest.firstPage()), internalRequest, dtoClass,
                     rootEntity);
         }
 
@@ -153,7 +149,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
     }
 
     private long count(QueryRequest clientRequest, QueryRequest internalRequest,
-            Class<?> dtoOrEntity, Class<T> rootEntity) {
+                       Class<?> dtoOrEntity, Class<T> rootEntity) {
 
         JoinContext countJoinCtx = new JoinContext();
 
