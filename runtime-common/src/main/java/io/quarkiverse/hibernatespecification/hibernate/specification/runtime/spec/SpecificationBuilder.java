@@ -9,13 +9,16 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.criteria.*;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.exception.SpecificationException;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
 
 @ApplicationScoped
 public class SpecificationBuilder {
 
-    private static final int MAX_FILTER_DEPTH = 32;
+    @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-depth", defaultValue = "32")
+    private static int MAX_FILTER_DEPTH;
 
     private final FieldMetaRegistry fieldMetaRegistry;
     private final ValueConverter valueConverter;

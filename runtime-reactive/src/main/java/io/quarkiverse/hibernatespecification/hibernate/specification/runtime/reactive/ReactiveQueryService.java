@@ -1,6 +1,5 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.reactive;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -13,12 +12,13 @@ import org.hibernate.reactive.mutiny.Mutiny;
 
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.annotation.DtoMapper;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
+import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.AbstractQueryExecutor;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.DtoMapperHelper;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.JoinContext;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.SpecificationBuilder;
 import io.smallrye.mutiny.Uni;
 
-public abstract class ReactiveQueryService<T> {
+public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
 
     private final Mutiny.SessionFactory sessionFactory;
     private final SpecificationBuilder specBuilder;
@@ -27,6 +27,7 @@ public abstract class ReactiveQueryService<T> {
 
     protected ReactiveQueryService(Mutiny.SessionFactory sessionFactory, SpecificationBuilder specBuilder,
             DtoMapperHelper dtoMapperHelper, Class<T> entityClass) {
+        super(specBuilder, dtoMapperHelper, entityClass);
         this.sessionFactory = Objects.requireNonNull(sessionFactory);
         this.specBuilder = Objects.requireNonNull(specBuilder);
         this.dtoMapperHelper = Objects.requireNonNull(dtoMapperHelper);
@@ -198,62 +199,4 @@ public abstract class ReactiveQueryService<T> {
         return session.createQuery(countCq).getSingleResult();
     }
 
-    private Function<SpecificationBuilder.CriteriaContext<T>, Predicate> buildClientPredicate(
-            QueryRequest clientRequest, Class<?> dtoOrEntity, JoinContext joinCtx) {
-
-        if (clientRequest == null) {
-            return null;
-        }
-        return specBuilder.buildPredicateWithJoin(clientRequest, dtoOrEntity, joinCtx);
-    }
-
-    private Function<SpecificationBuilder.CriteriaContext<T>, Predicate> buildInternalPredicate(
-            QueryRequest internalRequest, JoinContext joinCtx) {
-
-        if (internalRequest == null) {
-            return null;
-        }
-        return specBuilder.buildPredicateWithJoin(internalRequest, null, joinCtx);
-    }
-
-    private void applyWhere(CriteriaQuery<?> cq, SpecificationBuilder.CriteriaContext<T> ctx,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred) {
-
-        final List<Predicate> preds = new ArrayList<>(2);
-        if (clientPred != null) {
-            preds.add(clientPred.apply(ctx));
-        }
-        if (internalPred != null) {
-            preds.add(internalPred.apply(ctx));
-        }
-        if (!preds.isEmpty()) {
-            cq.where(preds.toArray(Predicate[]::new));
-        }
-    }
-
-    private void applySort(CriteriaQuery<?> cq, Root<T> root, CriteriaBuilder cb,
-            List<SortRequest> sorts, Class<?> dtoOrEntity, JoinContext joinCtx) {
-
-        if (sorts == null || sorts.isEmpty()) {
-            return;
-        }
-
-        final List<Order> orders = sorts.stream()
-                .filter(s -> s.field() != null && !s.field().isBlank())
-                .map(s -> {
-                    String entityPath = dtoOrEntity != null
-                            ? specBuilder.resolveSortPath(s.field(), dtoOrEntity)
-                            : s.field();
-                    Path<?> path = specBuilder.resolvePathWithJoin(root, entityPath, joinCtx);
-                    return s.direction() == SortDirection.DESC
-                            ? cb.desc(path)
-                            : cb.asc(path);
-                })
-                .collect(Collectors.toList());
-
-        if (!orders.isEmpty()) {
-            cq.orderBy(orders);
-        }
-    }
 }

@@ -15,21 +15,21 @@ import jakarta.transaction.Transactional.TxType;
 
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.annotation.DtoMapper;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
+import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.AbstractQueryExecutor;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.DtoMapperHelper;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.JoinContext;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.SpecificationBuilder;
 
-public abstract class QueryService<T> {
+public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
 
     private final EntityManager entityManager;
     private final SpecificationBuilder specBuilder;
     private final DtoMapperHelper dtoMapperHelper;
     private final Class<T> entityClass;
 
-    protected QueryService(EntityManager entityManager,
-            SpecificationBuilder specBuilder,
-            DtoMapperHelper dtoMapperHelper,
+    protected QueryService(EntityManager entityManager, SpecificationBuilder specBuilder, DtoMapperHelper dtoMapperHelper,
             Class<T> entityClass) {
+        super(specBuilder, dtoMapperHelper, entityClass);
         this.entityManager = Objects.requireNonNull(entityManager);
         this.specBuilder = Objects.requireNonNull(specBuilder);
         this.dtoMapperHelper = Objects.requireNonNull(dtoMapperHelper);
@@ -152,22 +152,6 @@ public abstract class QueryService<T> {
         return PageResponse.of(content, total, new PageRequest(page, size));
     }
 
-    private void applyWhere(CriteriaQuery<?> cq, SpecificationBuilder.CriteriaContext<T> ctx,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred,
-            Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred) {
-
-        List<Predicate> preds = new ArrayList<>(2);
-        if (clientPred != null) {
-            preds.add(clientPred.apply(ctx));
-        }
-        if (internalPred != null) {
-            preds.add(internalPred.apply(ctx));
-        }
-        if (!preds.isEmpty()) {
-            cq.where(preds.toArray(Predicate[]::new));
-        }
-    }
-
     private long count(QueryRequest clientRequest, QueryRequest internalRequest,
             Class<?> dtoOrEntity, Class<T> rootEntity) {
 
@@ -203,26 +187,4 @@ public abstract class QueryService<T> {
         return entityManager.createQuery(countCq).getSingleResult();
     }
 
-    private void applySort(CriteriaQuery<?> cq, Root<T> root, CriteriaBuilder cb,
-            List<SortRequest> sorts, Class<?> dtoOrEntity, JoinContext joinCtx) {
-
-        if (sorts == null || sorts.isEmpty()) {
-            return;
-        }
-
-        List<Order> orders = new ArrayList<>(sorts.size());
-        for (SortRequest s : sorts) {
-            if (s.field() == null || s.field().isBlank()) {
-                continue;
-            }
-            String entityPath = dtoOrEntity != null
-                    ? specBuilder.resolveSortPath(s.field(), dtoOrEntity)
-                    : s.field();
-            Path<?> path = specBuilder.resolvePathWithJoin(root, entityPath, joinCtx);
-            orders.add(s.direction() == SortDirection.DESC ? cb.desc(path) : cb.asc(path));
-        }
-        if (!orders.isEmpty()) {
-            cq.orderBy(orders);
-        }
-    }
 }
