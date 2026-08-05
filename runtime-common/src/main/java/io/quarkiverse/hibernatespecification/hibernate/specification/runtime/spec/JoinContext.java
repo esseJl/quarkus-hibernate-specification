@@ -2,6 +2,7 @@ package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.sp
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
@@ -20,12 +21,8 @@ public final class JoinContext {
     private final Map<String, From<?, ?>> joins = new HashMap<>();
     private boolean hasCollectionJoin = false;
 
-    /**
-     * Resolve dotted entity path with LEFT JOIN and reuse previous joins.
-     * Example: "user.profile.city" → creates/reuses joins for user and user.profile,
-     * then returns Path for city.
-     */
     public Path<?> resolve(From<?, ?> root, String entityPath) {
+        Objects.requireNonNull(root, "root must not be null");
         if (entityPath == null || entityPath.isBlank()) {
             throw new IllegalArgumentException("entityPath must not be blank");
         }
@@ -68,7 +65,6 @@ public final class JoinContext {
                 hasCollectionJoin = true;
             }
         } catch (Exception ignored) {
-            // some providers may not expose attribute
         }
     }
 
@@ -78,5 +74,10 @@ public final class JoinContext {
 
     public int joinCount() {
         return joins.size();
+    }
+
+    public void clear() {
+        joins.clear();
+        hasCollectionJoin = false;
     }
 }
