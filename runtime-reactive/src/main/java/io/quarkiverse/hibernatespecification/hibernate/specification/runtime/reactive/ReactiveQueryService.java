@@ -71,10 +71,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
                 .unis(fetchEntities(session, request, clientOnlyRequest, internalRequest, page, size, rootEntity),
                         count(session, clientOnlyRequest, internalRequest, null, rootEntity))
                 .asTuple()
-                .map(tuple -> PageResponse.of(
-                        (List<R>) tuple.getItem1(),
-                        tuple.getItem2(),
-                        new PageRequest(page, size))));
+                .map(tuple -> PageResponse.of((List<R>) tuple.getItem1(), tuple.getItem2(), new PageRequest(page, size))));
     }
 
     private Uni<List<T>> fetchEntities(Mutiny.Session session, QueryRequest request,
@@ -118,10 +115,6 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
                 .map(tuple -> {
                     final List<Tuple> tuples = tuple.getItem1();
                     long total = tuple.getItem2();
-
-                    if (page == 0 && tuples.size() < size) {
-                        total = tuples.size();
-                    }
 
                     final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
                     final List<D> content = tuples.stream()

@@ -18,7 +18,7 @@ import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.mod
 public class SpecificationBuilder {
 
     @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-depth", defaultValue = "32")
-    private static int MAX_FILTER_DEPTH;
+    private int maxFilterDepth;
 
     private final FieldMetaRegistry fieldMetaRegistry;
     private final ValueConverter valueConverter;
@@ -108,9 +108,9 @@ public class SpecificationBuilder {
         if (node == null) {
             return null;
         }
-        if (depth > MAX_FILTER_DEPTH) {
+        if (depth > maxFilterDepth) {
             throw new SpecificationException(
-                    "Filter tree exceeds maximum allowed depth of " + MAX_FILTER_DEPTH);
+                    "Filter tree exceeds maximum allowed depth of " + maxFilterDepth);
         }
 
         return switch (node.type()) {
