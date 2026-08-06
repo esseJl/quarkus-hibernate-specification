@@ -37,7 +37,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         PreparedQueryContext<T> ctx = prepare(request, dtoOrEntity);
         int offset = ctx.safeRequest().page().offset();
 
-        JoinContext joinCtx = new JoinContext();
+        JoinContext joinCtx = new JoinContext(specBuilder.maxJoins());
         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred = buildInternalPredicate(
                 ctx.internalRequest(), joinCtx);
         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(ctx.clientOnlyRequest(),
@@ -136,7 +136,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
     private long count(QueryRequest clientRequest, QueryRequest internalRequest,
             Class<?> dtoOrEntity, Class<T> rootEntity) {
 
-        JoinContext countJoinCtx = new JoinContext();
+        JoinContext countJoinCtx = new JoinContext(specBuilder.maxJoins());
 
         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = clientRequest == null ? null
                 : specBuilder.buildPredicateWithJoin(clientRequest, dtoOrEntity, countJoinCtx);

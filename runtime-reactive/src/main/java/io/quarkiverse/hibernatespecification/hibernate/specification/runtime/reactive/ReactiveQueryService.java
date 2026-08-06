@@ -33,7 +33,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         PreparedQueryContext<T> ctx = prepare(request, dtoOrEntity);
         int offset = ctx.safeRequest().page().offset();
 
-        JoinContext joinCtx = new JoinContext();
+        JoinContext joinCtx = new JoinContext(specBuilder.maxJoins());
         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred = buildInternalPredicate(
                 ctx.internalRequest(), joinCtx);
         Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(ctx.clientOnlyRequest(),
@@ -52,7 +52,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
             QueryRequest internalRequest, int page, int size, int offset, Class<T> rootEntity) {
 
         return sessionFactory.withSession(session -> {
-            final JoinContext joinCtx = new JoinContext();
+            final JoinContext joinCtx = new JoinContext(specBuilder.maxJoins());
             return fetchEntities(session, request, clientOnlyRequest, internalRequest, offset, size, rootEntity, joinCtx)
                     .chain(items -> {
                         if (page == 0 && items.size() < size && !joinCtx.hasCollectionJoin()) {
@@ -97,7 +97,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
             QueryRequest internalRequest, int page, int size, int offset, Class<?> dtoClass, Class<T> rootEntity) {
 
         return sessionFactory.withSession(session -> {
-            final JoinContext joinCtx = new JoinContext();
+            final JoinContext joinCtx = new JoinContext(specBuilder.maxJoins());
             return fetchProjected(session, request, clientOnlyRequest, internalRequest, offset, size, dtoClass, rootEntity,
                     joinCtx)
                     .chain(tuples -> {
@@ -161,7 +161,7 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     private Uni<Long> count(Mutiny.Session session, QueryRequest clientRequest,
             QueryRequest internalRequest, Class<?> dtoOrEntity, Class<T> rootEntity) {
 
-        final JoinContext countJoinCtx = new JoinContext();
+        final JoinContext countJoinCtx = new JoinContext(specBuilder.maxJoins());
 
         final Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(clientRequest,
                 dtoOrEntity, countJoinCtx);

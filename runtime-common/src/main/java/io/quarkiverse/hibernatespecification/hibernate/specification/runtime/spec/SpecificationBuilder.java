@@ -28,6 +28,9 @@ public class SpecificationBuilder {
     @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-nodes", defaultValue = "1000")
     private int maxFilterNodes;
 
+    @ConfigProperty(name = "quarkus.hibernate-specification.max-joins", defaultValue = "30")
+    private int maxJoins;
+
     private final FieldMetaRegistry fieldMetaRegistry;
     private final ValueConverter valueConverter;
     private final PathResolver pathResolver;
@@ -54,7 +57,7 @@ public class SpecificationBuilder {
             Class<?> dtoOrEntity) {
 
         return ctx -> {
-            JoinContext joinCtx = new JoinContext();
+            JoinContext joinCtx = new JoinContext(this.maxJoins);
             return this.<T> buildPredicateWithJoin(request, dtoOrEntity, joinCtx).apply(ctx);
         };
     }
@@ -71,8 +74,6 @@ public class SpecificationBuilder {
         final FilterNode rootNode = request.filter();
 
         return ctx -> {
-            // شمارنده‌ی گره‌ها به‌صورت محلی برای هر اجرای تابع ساخته می‌شود (نه فیلد کلاس)،
-            // پس علی‌رغم mutable بودن، بین درخواست‌های هم‌زمان به اشتراک گذاشته نمی‌شود و thread-safe است.
             int[] nodeBudget = { maxFilterNodes };
             Predicate predicate = buildNode(rootNode, ctx.root(), ctx.cb(), dtoOrEntity, joinCtx, 0, nodeBudget);
 
@@ -313,5 +314,9 @@ public class SpecificationBuilder {
 
     public int maxSortFields() {
         return maxSortFields;
+    }
+
+    public int maxJoins() {
+        return maxJoins;
     }
 }

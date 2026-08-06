@@ -205,4 +205,8 @@ public class FieldMetaRegistry {
         }
         return null;
     }
+
+    public void warmUp(Class<?> dtoOrEntity) {
+        getFieldMeta(dtoOrEntity);
+    }
 }
