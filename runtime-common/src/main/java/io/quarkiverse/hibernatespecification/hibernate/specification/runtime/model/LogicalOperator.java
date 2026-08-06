@@ -1,5 +1,7 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model;
 
+import java.util.Locale;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 public enum LogicalOperator {
@@ -11,6 +13,6 @@ public enum LogicalOperator {
     public static LogicalOperator from(String value) {
         if (value == null)
             return AND;
-        return LogicalOperator.valueOf(value.trim().toUpperCase());
+        return LogicalOperator.valueOf(value.trim().toUpperCase(Locale.ROOT));
     }
 }

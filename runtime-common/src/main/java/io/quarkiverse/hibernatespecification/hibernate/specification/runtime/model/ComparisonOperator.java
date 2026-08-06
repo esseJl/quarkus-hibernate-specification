@@ -1,5 +1,7 @@
 package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model;
 
+import java.util.Locale;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 public enum ComparisonOperator {
@@ -26,6 +28,6 @@ public enum ComparisonOperator {
         if (value == null) {
             throw new IllegalArgumentException("operator is required");
         }
-        return ComparisonOperator.valueOf(value.trim().toUpperCase().replace('-', '_'));
+        return ComparisonOperator.valueOf(value.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
     }
 }

@@ -13,7 +13,6 @@ import jakarta.persistence.criteria.*;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.annotation.DtoMapper;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.AbstractQueryExecutor;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.DtoMapperHelper;
@@ -32,37 +31,24 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
 
     protected abstract QueryRequest initFiltersAndSorts();
 
-    @Transactional(TxType.SUPPORTS)
+    @Transactional(TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public <R> PageResponse<R> query(QueryRequest request, Class<R> dtoOrEntity) {
-        QueryRequest safeRequest = request != null ? request : QueryRequest.of(null);
-        PageRequest pageReq = safeRequest.page();
-        int page = pageReq.page();
-        int size = pageReq.size();
-        int offset = pageReq.offset();
-
-        boolean isDtoProjection = dtoOrEntity != null && dtoOrEntity.isAnnotationPresent(DtoMapper.class);
-        Class<T> rootEntity = isDtoProjection
-                ? (Class<T>) specBuilder.resolveEntityClass(dtoOrEntity)
-                : entityClass;
+        PreparedQueryContext<T> ctx = prepare(request, dtoOrEntity);
+        int offset = ctx.safeRequest().page().offset();
 
         JoinContext joinCtx = new JoinContext();
+        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred = buildInternalPredicate(
+                ctx.internalRequest(), joinCtx);
+        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(ctx.clientOnlyRequest(),
+                dtoOrEntity, joinCtx);
 
-        QueryRequest internalRequest = initFiltersAndSorts();
-        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred = specBuilder
-                .buildPredicateWithJoin(internalRequest, null, joinCtx);
-
-        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = safeRequest.filter() == null ? null
-                : specBuilder.buildPredicateWithJoin(
-                        new QueryRequest(safeRequest.filter(), List.of(), PageRequest.firstPage()),
-                        dtoOrEntity, joinCtx);
-
-        if (isDtoProjection) {
-            return findProjected(safeRequest, clientPred, internalPred, joinCtx, page, size, offset,
-                    dtoOrEntity, rootEntity, internalRequest);
+        if (ctx.isDtoProjection()) {
+            return findProjected(ctx.safeRequest(), clientPred, internalPred, joinCtx,
+                    ctx.page(), ctx.size(), offset, dtoOrEntity, ctx.rootEntity(), ctx.internalRequest());
         }
-        return (PageResponse<R>) findEntities(safeRequest, clientPred, internalPred, joinCtx,
-                page, size, offset, rootEntity, internalRequest);
+        return (PageResponse<R>) findEntities(ctx.safeRequest(), clientPred, internalPred, joinCtx,
+                ctx.page(), ctx.size(), offset, ctx.rootEntity(), ctx.internalRequest());
     }
 
     private PageResponse<T> findEntities(QueryRequest request,
@@ -88,10 +74,6 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         dataQuery.setMaxResults(size);
         List<T> content = dataQuery.getResultList();
 
-        // FIX (سازگاری/بهینه‌سازی): همان shortcut موجود در findProjected این‌جا هم اعمال شد.
-        // اگر صفحه‌ی اول باشد و تعداد نتایج کمتر از سایزِ صفحه باشد (و JOINِ
-        // collection‌ای در کار نباشد)، دیگر نیازی به یک کوئری COUNT جداگانه نیست؛
-        // چون totalElements دقیقاً همان content.size() است.
         long total;
         if (page == 0 && content.size() < size && !joinCtx.hasCollectionJoin()) {
             total = content.size();
@@ -119,12 +101,7 @@ public abstract class QueryService<T> extends AbstractQueryExecutor<T> {
         Root<T> root = cq.from(rootEntity);
 
         List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
-        List<Selection<?>> selections = new ArrayList<>(metas.size());
-        for (FieldMeta m : metas) {
-            Path<?> path = specBuilder.resolvePathWithJoin(root, m.entityPath(), joinCtx);
-            selections.add(path.alias(SpecificationBuilder.sanitizeAlias(m.dtoName())));
-        }
-        cq.multiselect(selections);
+        cq.multiselect(specBuilder.buildProjectionSelectionsWithAlias(root, dtoClass, joinCtx));
 
         if (joinCtx.hasCollectionJoin()) {
             cq.distinct(true);

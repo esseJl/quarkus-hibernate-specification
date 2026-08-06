@@ -2,8 +2,10 @@ package io.quarkiverse.hibernatespecification.hibernate.specification.runtime.sp
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -20,11 +22,9 @@ public class SpecificationBuilder {
     @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-depth", defaultValue = "32")
     private int maxFilterDepth;
 
-    // FIX: قبلاً فقط عمق (depth) درخت فیلتر محدود می‌شد. یک کلاینت مخرب می‌توانست
-    // یک FilterGroup تخت (depth=1) با صدها هزار child بسازد که هیچ‌کدام از حد عمق
-    // رد نمی‌شدند اما پردازش آن‌ها (ساخت Predicate برای هر کدام + آرایه‌ی نهایی)
-    // می‌توانست CPU/Heap زیادی مصرف کند - یک نوع Algorithmic Complexity DoS.
-    // این مقدار، سقفِ کل تعداد گره‌های قابل پردازش در یک درخواست را تعیین می‌کند.
+    @ConfigProperty(name = "quarkus.hibernate-specification.max-sort-fields", defaultValue = "20")
+    private int maxSortFields;
+
     @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-nodes", defaultValue = "1000")
     private int maxFilterNodes;
 
@@ -88,17 +88,14 @@ public class SpecificationBuilder {
         return fieldMetaRegistry.getProjectionFieldMetas(dtoOrEntity);
     }
 
-    public <T> List<Selection<?>> buildProjectionSelectionsWithAlias(
-            Root<T> root, Class<?> dtoOrEntity, JoinContext joinCtx) {
-
+    public <T> List<Selection<?>> buildProjectionSelectionsWithAlias(Root<T> root, Class<?> dtoOrEntity, JoinContext joinCtx) {
         List<FieldMeta> metas = fieldMetaRegistry.getProjectionFieldMetas(dtoOrEntity);
-        List<Selection<?>> selections = new ArrayList<>(metas.size());
-        for (FieldMeta m : metas) {
-            Path<?> path = pathResolver.resolvePathWithJoin(root, m.entityPath(), joinCtx);
-            String alias = sanitizeAlias(m.dtoName());
-            selections.add(path.alias(alias));
-        }
-        return selections;
+        return metas.stream()
+                .map(m -> {
+                    Path<?> path = this.resolvePathWithJoin(root, m.entityPath(), joinCtx);
+                    return path.alias(SpecificationBuilder.sanitizeAlias(m.dtoName()));
+                })
+                .collect(Collectors.toList());
     }
 
     public String resolveSortPath(String clientField, Class<?> dtoOrEntity) {
@@ -276,7 +273,7 @@ public class SpecificationBuilder {
         if (suffixWildcard) {
             pattern = pattern + "%";
         }
-        return cb.like(cb.lower(path.as(String.class)), pattern.toLowerCase(), '\\');
+        return cb.like(cb.lower(path.as(String.class)), pattern.toLowerCase(Locale.ROOT), '\\');
     }
 
     private static String escapeLike(String raw) {
@@ -312,5 +309,9 @@ public class SpecificationBuilder {
             Root<T> root,
             CriteriaQuery<?> query,
             CriteriaBuilder cb) {
+    }
+
+    public int maxSortFields() {
+        return maxSortFields;
     }
 }

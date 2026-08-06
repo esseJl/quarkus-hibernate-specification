@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import jakarta.persistence.criteria.*;
 
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.annotation.DtoMapper;
+import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.exception.SpecificationException;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
 
 public abstract class AbstractQueryExecutor<T> {
@@ -81,6 +82,11 @@ public abstract class AbstractQueryExecutor<T> {
 
         if (sorts == null || sorts.isEmpty()) {
             return;
+        }
+
+        if (sorts.size() > specBuilder.maxSortFields()) {
+            throw new SpecificationException(
+                    "Too many sort fields: " + sorts.size() + " (max allowed: " + specBuilder.maxSortFields() + ")");
         }
 
         List<Order> orders = sorts.stream()

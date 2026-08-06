@@ -10,7 +10,6 @@ import jakarta.persistence.criteria.*;
 
 import org.hibernate.reactive.mutiny.Mutiny;
 
-import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.annotation.DtoMapper;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.model.*;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.AbstractQueryExecutor;
 import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.spec.DtoMapperHelper;
@@ -31,31 +30,21 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
     protected abstract QueryRequest initFiltersAndSorts();
 
     public <R> Uni<PageResponse<R>> query(QueryRequest request, Class<R> dtoOrEntity) {
-        final QueryRequest safeRequest = request != null ? request : QueryRequest.of(null);
-        final PageRequest pageReq = safeRequest.page();
-        final int page = pageReq.page();
-        final int size = pageReq.size();
-        final int offset = pageReq.offset();
+        PreparedQueryContext<T> ctx = prepare(request, dtoOrEntity);
+        int offset = ctx.safeRequest().page().offset();
 
-        final boolean isDtoProjection = dtoOrEntity != null
-                && dtoOrEntity.isAnnotationPresent(DtoMapper.class);
+        JoinContext joinCtx = new JoinContext();
+        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred = buildInternalPredicate(
+                ctx.internalRequest(), joinCtx);
+        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(ctx.clientOnlyRequest(),
+                dtoOrEntity, joinCtx);
 
-        @SuppressWarnings("unchecked")
-        final Class<T> rootEntity = isDtoProjection
-                ? (Class<T>) specBuilder.resolveEntityClass(dtoOrEntity)
-                : entityClass;
-
-        final QueryRequest internalRequest = initFiltersAndSorts();
-        final QueryRequest clientOnlyRequest = safeRequest.filter() == null
-                ? null
-                : new QueryRequest(safeRequest.filter(), List.of(), PageRequest.firstPage());
-
-        if (isDtoProjection) {
-            return executeProjected(safeRequest, clientOnlyRequest, internalRequest,
-                    page, size, offset, dtoOrEntity, rootEntity);
+        if (ctx.isDtoProjection()) {
+            return executeProjected(ctx.safeRequest(), ctx.clientOnlyRequest(), ctx.internalRequest(),
+                    ctx.page(), ctx.size(), offset, dtoOrEntity, ctx.rootEntity());
         }
-        return executeEntity(safeRequest, clientOnlyRequest, internalRequest,
-                page, size, offset, rootEntity);
+        return executeEntity(ctx.safeRequest(), ctx.clientOnlyRequest(), ctx.internalRequest(),
+                ctx.page(), ctx.size(), offset, ctx.rootEntity());
     }
 
     @SuppressWarnings("unchecked")
@@ -66,11 +55,6 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
             final JoinContext joinCtx = new JoinContext();
             return fetchEntities(session, request, clientOnlyRequest, internalRequest, offset, size, rootEntity, joinCtx)
                     .chain(items -> {
-                        // FIX (سازگاری/بهینه‌سازی): همان shortcut که در نسخه‌ی blocking برای
-                        // findProjected وجود داشت اما این‌جا نبود. اگر صفحه‌ی اول باشد و تعداد
-                        // نتایج کمتر از سایزِ صفحه باشد (و JOINِ collection‌ای در کار نباشد)،
-                        // یعنی داده‌ی بیشتری برای شمارش وجود ندارد و نیازی به یک کوئری COUNT
-                        // جداگانه (یک round-trip اضافه‌ی شبکه به دیتابیس) نیست.
                         if (page == 0 && items.size() < size && !joinCtx.hasCollectionJoin()) {
                             return Uni.createFrom().item(
                                     PageResponse.of((List<R>) items, items.size(), new PageRequest(page, size)));
@@ -119,7 +103,6 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
                     .chain(tuples -> {
                         final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
 
-                        // FIX: shortcut شمارش، دقیقاً هم‌راستا با نسخه‌ی blocking (findProjected).
                         if (page == 0 && tuples.size() < size && !joinCtx.hasCollectionJoin()) {
                             @SuppressWarnings("unchecked")
                             final List<D> content = tuples.stream()
@@ -156,15 +139,9 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         final CriteriaQuery<Tuple> cq = cb.createTupleQuery();
         final Root<T> root = cq.from(rootEntity);
 
-        final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
-        final List<Selection<?>> selections = metas.stream()
-                .map(m -> {
-                    Path<?> path = specBuilder.resolvePathWithJoin(root, m.entityPath(), joinCtx);
-                    return path.alias(SpecificationBuilder.sanitizeAlias(m.dtoName()));
-                })
-                .collect(Collectors.toList());
+        //final List<FieldMeta> metas = specBuilder.getProjectionFieldMetas(dtoClass);
 
-        cq.multiselect(selections);
+        cq.multiselect(specBuilder.buildProjectionSelectionsWithAlias(root, dtoClass, joinCtx));
 
         if (joinCtx.hasCollectionJoin()) {
             cq.distinct(true);
