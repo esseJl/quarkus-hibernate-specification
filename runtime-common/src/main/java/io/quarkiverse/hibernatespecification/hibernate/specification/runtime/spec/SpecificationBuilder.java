@@ -19,17 +19,10 @@ import io.quarkiverse.hibernatespecification.hibernate.specification.runtime.mod
 @ApplicationScoped
 public class SpecificationBuilder {
 
-    @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-depth", defaultValue = "32")
-    private int maxFilterDepth;
-
-    @ConfigProperty(name = "quarkus.hibernate-specification.max-sort-fields", defaultValue = "20")
-    private int maxSortFields;
-
-    @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-nodes", defaultValue = "1000")
-    private int maxFilterNodes;
-
-    @ConfigProperty(name = "quarkus.hibernate-specification.max-joins", defaultValue = "30")
-    private int maxJoins;
+    private final int maxFilterDepth;
+    private final int maxSortFields;
+    private final int maxFilterNodes;
+    private final int maxJoins;
 
     private final FieldMetaRegistry fieldMetaRegistry;
     private final ValueConverter valueConverter;
@@ -43,13 +36,18 @@ public class SpecificationBuilder {
     }
 
     @Inject
-    public SpecificationBuilder(
-            FieldMetaRegistry fieldMetaRegistry,
-            ValueConverter valueConverter,
-            PathResolver pathResolver) {
+    public SpecificationBuilder(FieldMetaRegistry fieldMetaRegistry, ValueConverter valueConverter, PathResolver pathResolver,
+            @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-depth", defaultValue = "32") int maxFilterDepth,
+            @ConfigProperty(name = "quarkus.hibernate-specification.max-sort-fields", defaultValue = "20") int maxSortFields,
+            @ConfigProperty(name = "quarkus.hibernate-specification.max-filter-nodes", defaultValue = "1000") int maxFilterNodes,
+            @ConfigProperty(name = "quarkus.hibernate-specification.max-joins", defaultValue = "30") int maxJoins) {
         this.fieldMetaRegistry = fieldMetaRegistry;
         this.valueConverter = valueConverter;
         this.pathResolver = pathResolver;
+        this.maxFilterDepth = maxFilterDepth;
+        this.maxSortFields = maxSortFields;
+        this.maxFilterNodes = maxFilterNodes;
+        this.maxJoins = maxJoins;
     }
 
     public <T> Function<CriteriaContext<T>, Predicate> buildPredicate(

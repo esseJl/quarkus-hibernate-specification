@@ -33,12 +33,6 @@ public abstract class ReactiveQueryService<T> extends AbstractQueryExecutor<T> {
         PreparedQueryContext<T> ctx = prepare(request, dtoOrEntity);
         int offset = ctx.safeRequest().page().offset();
 
-        JoinContext joinCtx = new JoinContext(specBuilder.maxJoins());
-        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> internalPred = buildInternalPredicate(
-                ctx.internalRequest(), joinCtx);
-        Function<SpecificationBuilder.CriteriaContext<T>, Predicate> clientPred = buildClientPredicate(ctx.clientOnlyRequest(),
-                dtoOrEntity, joinCtx);
-
         if (ctx.isDtoProjection()) {
             return executeProjected(ctx.safeRequest(), ctx.clientOnlyRequest(), ctx.internalRequest(),
                     ctx.page(), ctx.size(), offset, dtoOrEntity, ctx.rootEntity());

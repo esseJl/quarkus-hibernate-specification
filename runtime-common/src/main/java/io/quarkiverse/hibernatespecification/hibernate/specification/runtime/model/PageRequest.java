@@ -24,6 +24,11 @@ public record PageRequest(int page, int size) {
     }
 
     public int offset() {
-        return Math.multiplyExact(page, size);
+        try {
+            return Math.multiplyExact(page, size);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(
+                    "Requested page (" + page + ") is too large for page size (" + size + ")", e);
+        }
     }
 }
